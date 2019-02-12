@@ -106,7 +106,9 @@
 #include <xfer/Transfer.h>
 
 // stk_util
+#include <utils/StkHelpers.h>
 #include <stk_util/parallel/Parallel.hpp>
+#include <stk_util/parallel/ParallelReduce.hpp>
 #include <stk_util/environment/WallTime.hpp>
 #include <stk_util/environment/perf_util.hpp>
 #include <stk_util/environment/FileUtils.hpp>
@@ -130,8 +132,8 @@
 #include <stk_io/InputFile.hpp>
 #include <Ioss_SubSystem.h>
 
-// stk_util
-#include <stk_util/parallel/ParallelReduce.hpp>
+// stk_balance
+#include <stk_balance/balance.hpp>
 
 // Ioss for propertManager (io)
 #include <Ioss_PropertyManager.h>
@@ -499,6 +501,16 @@ Realm::initialize()
   // check that all bcs are covering exposed surfaces
   if ( checkForMissingBcs_ )
     enforce_bc_on_exposed_faces();
+
+  stk::balance::BasicColoringSettings coloringSettings;
+  stk::balance::colorStkMesh(coloringSettings, *bulkData_);
+  stk::balance::fill_coloring_parts(*metaData_, coloringParts_);
+  for (const stk::mesh::Part* part : coloringParts_)
+  {
+    NaluEnv::self().naluOutputP0() << "Coloring part: " << part->name() << std::endl;
+  }
+
+  sierra::nalu::dump_bucket_statistics(*bulkData_, NaluEnv::self().naluOutputP0());
 
   // output and restart files
   create_output_mesh();

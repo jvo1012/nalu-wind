@@ -648,8 +648,11 @@ class Realm {
    */
   bool hypreIsActive_{false};
 
+  const stk::mesh::PartVector& get_coloring_parts() const { return coloringParts_; }
+
 protected:
   std::unique_ptr<ngp::Mesh> ngpMesh_;
+  stk::mesh::PartVector coloringParts_;
 
 };
 

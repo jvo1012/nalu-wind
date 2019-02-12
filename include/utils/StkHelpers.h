@@ -114,6 +114,8 @@ unsigned get_field_ordinal(
   return fState->mesh_meta_data_ordinal();
 }
 
+void dump_bucket_statistics(const stk::mesh::BulkData& bulk, std::ostream& os);
+
 } // namespace nalu
 } // namespace sierra
 

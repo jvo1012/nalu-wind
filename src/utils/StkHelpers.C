@@ -11,6 +11,7 @@
 #include "stk_util/parallel/ParallelReduce.hpp"
 #include "stk_util/parallel/CommSparse.hpp"
 #include "stk_util/util/SortAndUnique.hpp"
+#include <cmath>
 
 namespace sierra {
 namespace nalu {
@@ -145,6 +146,44 @@ compute_precise_ghosting_lists(
 
   communicate_to_fill_recv_ghosts_to_remove(
     bulk, sendGhostsToRemove, recvGhostsToRemove);
+}
+
+struct BucketStatistics 
+{
+  unsigned numBuckets;
+  unsigned totalNumElems;
+};
+
+void dump_bucket_statistics(const stk::mesh::BulkData& bulk, std::ostream& os)
+{
+  std::map< stk::topology, BucketStatistics > topologyToBucketMap;
+  std::set< stk::topology > topologies; 
+
+  const stk::mesh::BucketVector& buckets = bulk.get_buckets(stk::topology::ELEMENT_RANK, bulk.mesh_meta_data().locally_owned_part());
+  for (const stk::mesh::Bucket* bucket : buckets)
+  {
+    topologies.insert(bucket->topology());
+  }
+
+  for (stk::topology topology : topologies)
+  {
+    BucketStatistics stats{0, 0};
+    topologyToBucketMap[topology] = stats;
+    for (const stk::mesh::Bucket* bucket : buckets)
+    {
+      if (bucket->topology() == topology)
+      {
+        topologyToBucketMap[topology].numBuckets += 1;
+        topologyToBucketMap[topology].totalNumElems += bucket->size();
+      }
+    }
+  }
+  
+  for (auto& mapIt : topologyToBucketMap)
+  {
+    int avgElems = std::nearbyint((double)mapIt.second.totalNumElems / mapIt.second.numBuckets);
+    os << mapIt.first << ":\t NumBuckets = " << mapIt.second.numBuckets << ", avgNumElems = " << avgElems << std::endl;
+  }
 }
 
 } // namespace nalu
