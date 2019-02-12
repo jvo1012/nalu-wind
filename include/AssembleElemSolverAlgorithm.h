@@ -64,7 +64,10 @@ public:
       dataNeededNGP);
     const stk::mesh::PartVector universalPartVec = {&meta_data.universal_part()};
 
-    const stk::mesh::PartVector& coloringParts = entityRank_ == stk::topology::ELEMENT_RANK ? realm_.get_coloring_parts_for_topology(partVec_[0]->topology()) : universalPartVec;
+    const stk::mesh::PartVector& coloringParts = (realm_.is_mesh_colored() && entityRank_ == stk::topology::ELEMENT_RANK) 
+                                               ? realm_.get_coloring_parts_for_topology(partVec_[0]->topology()) : universalPartVec;
+
+    static std::map<stk::topology, bool> topologyBool;
 
     for (const stk::mesh::Part* colorPart : coloringParts)
     {
@@ -77,6 +80,12 @@ public:
 
       const auto& elem_buckets =
         ngp::get_bucket_ids(bulk_data, entityRank_, elemSelector);
+
+      if (!topologyBool[partVec_[0]->topology()])
+      {
+         topologyBool[partVec_[0]->topology()] = true;
+         NaluEnv::self().naluOutputP0() << "ColorPart: " << colorPart->name() << ", number of elem buckets: " << elem_buckets.size() << std::endl;
+      }
 
       // Create local copies of class data
       const auto entityRank = entityRank_;

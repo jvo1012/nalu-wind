@@ -660,11 +660,12 @@ class Realm {
 
   const stk::mesh::PartVector& get_coloring_parts_for_topology(const stk::topology topo);
 
-  bool is_mesh_colored() const { return !coloringPartMap_.empty(); }
+  bool is_mesh_colored() const { return meshIsColored_; }
 
 protected:
   std::unique_ptr<ngp::Mesh> ngpMesh_;
   std::map<stk::topology, stk::mesh::PartVector> coloringPartMap_;
+  bool meshIsColored_{false};
 
   std::unique_ptr<ngp::FieldManager> ngpFieldMgr_;
 

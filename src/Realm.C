@@ -504,25 +504,26 @@ Realm::initialize()
   if ( checkForMissingBcs_ )
     enforce_bc_on_exposed_faces();
 
-  std::ios_base::fmtflags f( NaluEnv::self().naluOutputP0().flags() );
+  // std::ios_base::fmtflags f( NaluEnv::self().naluOutputP0().flags() );
 
-  double start_time = NaluEnv::self().nalu_time();
-  stk::balance::BasicColoringByTopologySettings coloringSettings;
-  stk::balance::colorStkMesh(coloringSettings, *bulkData_);
+  // double start_time = NaluEnv::self().nalu_time();
+  // stk::balance::BasicColoringByTopologySettings coloringSettings;
+  // meshIsColored_ = stk::balance::colorStkMesh(coloringSettings, *bulkData_);
 
-  for (stk::mesh::Part* part : stk::balance::get_root_topology_parts_for_rank(*bulkData_, stk::topology::ELEMENT_RANK))
-  {
-    stk::mesh::PartVector coloringParts;
-    stk::topology topo = part->topology();
-    stk::balance::fill_coloring_parts_with_topology(*metaData_, topo, coloringParts);
-    coloringPartMap_.insert(std::make_pair(topo, coloringParts));  
-    NaluEnv::self().naluOutputP0() << "Number of Colors for " << topo.name() << " = " << coloringParts.size() << std::endl;
-  }
-  
-  double end_time = NaluEnv::self().nalu_time();
-  NaluEnv::self().naluOutputP0().flags( f );
+  // const stk::mesh::PartVector rootTopoParts = stk::balance::get_root_topology_parts_for_rank(*bulkData_, stk::topology::ELEMENT_RANK);
+  // for (stk::mesh::Part* part : rootTopoParts)
+  // {
+  //   stk::mesh::PartVector coloringParts;
+  //   stk::topology topo = part->topology();
+  //   stk::balance::fill_coloring_parts_with_topology(*metaData_, topo, coloringParts);
+  //   coloringPartMap_.insert(std::make_pair(topo, coloringParts));  
+  //   NaluEnv::self().naluOutputP0() << "Number of Colors for " << topo.name() << " = " << coloringParts.size() << std::endl;
+  // }
+  // 
+  // double end_time = NaluEnv::self().nalu_time();
+  // NaluEnv::self().naluOutputP0().flags( f );
 
-  NaluEnv::self().naluOutputP0() << "Time for coloring = " << (end_time - start_time) << " seconds" << std::endl;
+  // NaluEnv::self().naluOutputP0() << "Time for coloring = " << (end_time - start_time) << " seconds" << std::endl;
   sierra::nalu::dump_bucket_statistics(*bulkData_, NaluEnv::self().naluOutputP0());
 
   // output and restart files
@@ -2098,7 +2099,7 @@ Realm::create_mesh()
   
   // news for mesh constructs
   metaData_ = new stk::mesh::MetaData();
-  bulkData_ = new stk::mesh::BulkData(*metaData_, pm, activateAura_ ? stk::mesh::BulkData::AUTO_AURA : stk::mesh::BulkData::NO_AUTO_AURA);
+  bulkData_ = new stk::mesh::BulkData(*metaData_, pm, activateAura_ ? stk::mesh::BulkData::AUTO_AURA : stk::mesh::BulkData::NO_AUTO_AURA, false, nullptr, 128);
   ioBroker_ = new stk::io::StkMeshIoBroker( pm );
   ioBroker_->set_bulk_data(*bulkData_);
 

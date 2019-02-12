@@ -1366,8 +1366,9 @@ TpetraLinearSystem::zeroSystem()
 bool should_use_atomic(const Realm& realm)
 {
 #ifdef KOKKOS_ENABLE_OPENMP
-  int numThreads = Kokkos::HostSpace::execution_space::concurrency();
-  return numThreads > 1 && realm.is_mesh_colored();
+  // int numThreads = Kokkos::HostSpace::execution_space::concurrency();
+  // return numThreads > 1 && !realm.is_mesh_colored();
+  return true;
 #else
   return false;
 #endif
@@ -1534,7 +1535,7 @@ TpetraLinearSystem::sumInto(
   const SharedMemView<int*> & sortPermutation,
   const char *  /* trace_tag */)
 {
-  constexpr bool forceAtomic = !std::is_same<sierra::nalu::DeviceSpace, Kokkos::Serial>::value;
+  const bool forceAtomic = should_use_atomic(realm_);
 
   ThrowAssertMsg(lhs.span_is_contiguous(), "LHS assumed contiguous");
   ThrowAssertMsg(rhs.span_is_contiguous(), "RHS assumed contiguous");
@@ -1568,7 +1569,7 @@ TpetraLinearSystem::sumInto(
     ThrowAssertMsg(std::isfinite(cur_rhs), "Inf or NAN rhs");
 
     if(rowLid < maxOwnedRowId_) {
-      sum_into_row(ownedLocalMatrix_.row(rowLid), n_obj, numDof_, localIds.data(), sortPermutation.data(), cur_lhs);
+      sum_into_row(ownedLocalMatrix_.row(rowLid), n_obj, numDof_, localIds.data(), sortPermutation.data(), cur_lhs, forceAtomic);
       if (forceAtomic) {
         Kokkos::atomic_add(&ownedLocalRhs_(rowLid,0), cur_rhs);
       }
@@ -1579,7 +1580,7 @@ TpetraLinearSystem::sumInto(
     else if (rowLid < maxSharedNotOwnedRowId_) {
       LocalOrdinal actualLocalId = rowLid - maxOwnedRowId_;
       sum_into_row(sharedNotOwnedLocalMatrix_.row(actualLocalId), n_obj, numDof_,
-        localIds.data(), sortPermutation.data(), cur_lhs);
+        localIds.data(), sortPermutation.data(), cur_lhs, forceAtomic);
 
       if (forceAtomic) {
         Kokkos::atomic_add(&sharedNotOwnedLocalRhs_(actualLocalId,0), cur_rhs);
