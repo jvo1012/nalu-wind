@@ -1362,6 +1362,21 @@ TpetraLinearSystem::zeroSystem()
   sln_->putScalar(0);
 }
 
+bool is_mesh_colored(const Realm& realm)
+{
+  return !realm.get_coloring_parts().empty();
+}
+
+bool should_use_atomic(const Realm& realm)
+{
+#ifdef KOKKOS_ENABLE_OPENMP
+  int numThreads = Kokkos::HostSpace::execution_space::concurrency();
+  return numThreads > 1 && is_mesh_colored(realm);
+#else
+  return false;
+#endif
+}
+
 namespace
 {
 template<typename RowViewType>
@@ -1370,11 +1385,11 @@ void sum_into_row_vec_3(
   const int num_entities,
   const int* localIds,
   const int* sort_permutation,
-  const double* input_values)
+  const double* input_values,
+  const bool forceAtomic)
 {
   // assumes that the flattened column indices for block matrices are all stored sequentially
   // specialized for numDof == 3
-  constexpr bool forceAtomic = !std::is_same<sierra::nalu::DeviceSpace, Kokkos::Serial>::value;
   const LocalOrdinal length = row_view.length;
 
   LocalOrdinal offset = 0;
@@ -1409,14 +1424,15 @@ void sum_into_row (
   const int num_entities, const int numDof,
   const int* localIds,
   const int* sort_permutation,
-  const double* input_values)
+  const double* input_values,
+  const bool forceAtomic)
+
 {
   if (numDof == 3) {
-    sum_into_row_vec_3(row_view, num_entities, localIds, sort_permutation, input_values);
+    sum_into_row_vec_3(row_view, num_entities, localIds, sort_permutation, input_values, forceAtomic);
     return;
   }
 
-  constexpr bool forceAtomic = !std::is_same<sierra::nalu::DeviceSpace, Kokkos::Serial>::value;
   const LocalOrdinal length = row_view.length;
 
   const int numCols = num_entities * numDof;
@@ -1455,7 +1471,7 @@ TpetraLinearSystem::sumInto(
       const SharedMemView<int*> & sortPermutation,
       const char *  /* trace_tag */)
 {
-  constexpr bool forceAtomic = !std::is_same<sierra::nalu::DeviceSpace, Kokkos::Serial>::value;
+  const bool forceAtomic = should_use_atomic(realm_);
 
   ThrowAssertMsg(lhs.span_is_contiguous(), "LHS assumed contiguous");
   ThrowAssertMsg(rhs.span_is_contiguous(), "RHS assumed contiguous");
@@ -1489,7 +1505,7 @@ TpetraLinearSystem::sumInto(
     ThrowAssertMsg(std::isfinite(cur_rhs), "Inf or NAN rhs");
 
     if(rowLid < maxOwnedRowId_) {
-      sum_into_row(ownedLocalMatrix_.row(rowLid), n_obj, numDof_, localIds.data(), sortPermutation.data(), cur_lhs);
+      sum_into_row(ownedLocalMatrix_.row(rowLid), n_obj, numDof_, localIds.data(), sortPermutation.data(), cur_lhs, forceAtomic);
       if (forceAtomic) {
         Kokkos::atomic_add(&ownedLocalRhs_(rowLid,0), cur_rhs);
       }
@@ -1500,7 +1516,7 @@ TpetraLinearSystem::sumInto(
     else if (rowLid < maxSharedNotOwnedRowId_) {
       LocalOrdinal actualLocalId = rowLid - maxOwnedRowId_;
       sum_into_row(sharedNotOwnedLocalMatrix_.row(actualLocalId), n_obj, numDof_,
-        localIds.data(), sortPermutation.data(), cur_lhs);
+        localIds.data(), sortPermutation.data(), cur_lhs, forceAtomic);
 
       if (forceAtomic) {
         Kokkos::atomic_add(&sharedNotOwnedLocalRhs_(actualLocalId,0), cur_rhs);
@@ -1539,6 +1555,7 @@ TpetraLinearSystem::sumInto(
     }
   }
 
+  const bool forceAtomic = should_use_atomic(realm_);
   for (unsigned i = 0; i < numRows; ++i) {
     sortPermutation_[i] = i;
   }
@@ -1554,13 +1571,13 @@ TpetraLinearSystem::sumInto(
     ThrowAssertMsg(std::isfinite(cur_rhs), "Invalid rhs");
 
     if(rowLid < maxOwnedRowId_) {
-      sum_into_row(ownedLocalMatrix_.row(rowLid),  n_obj, numDof_, scratchIds.data(), sortPermutation_.data(), cur_lhs);
+      sum_into_row(ownedLocalMatrix_.row(rowLid),  n_obj, numDof_, scratchIds.data(), sortPermutation_.data(), cur_lhs, forceAtomic);
       ownedLocalRhs_(rowLid,0) += cur_rhs;
     }
     else if (rowLid < maxSharedNotOwnedRowId_) {
       LocalOrdinal actualLocalId = rowLid - maxOwnedRowId_;
       sum_into_row(sharedNotOwnedLocalMatrix_.row(actualLocalId),  n_obj, numDof_,
-        scratchIds.data(), sortPermutation_.data(), cur_lhs);
+        scratchIds.data(), sortPermutation_.data(), cur_lhs, forceAtomic);
 
       sharedNotOwnedLocalRhs_(actualLocalId,0) += cur_rhs;
     }
