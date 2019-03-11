@@ -15,7 +15,6 @@
 #include "stk_mesh/base/Types.hpp"
 
 namespace stk { namespace mesh { class BulkData; } }
-namespace stk { namespace mesh { class MetaData;; } }
 
 namespace sierra {
 namespace nalu {
