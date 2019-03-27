@@ -1362,16 +1362,11 @@ TpetraLinearSystem::zeroSystem()
   sln_->putScalar(0);
 }
 
-bool is_mesh_colored(const Realm& realm)
-{
-  return !realm.get_coloring_parts().empty();
-}
-
 bool should_use_atomic(const Realm& realm)
 {
 #ifdef KOKKOS_ENABLE_OPENMP
   int numThreads = Kokkos::HostSpace::execution_space::concurrency();
-  return numThreads > 1 && is_mesh_colored(realm);
+  return numThreads > 1 && realm.is_mesh_colored();
 #else
   return false;
 #endif

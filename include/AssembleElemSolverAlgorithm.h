@@ -60,7 +60,8 @@ public:
                                                                      meta_data.spatial_dimension(), dataNeededNGP);
     
     const stk::mesh::PartVector universalPartVec = {&meta_data.universal_part()};
-    const stk::mesh::PartVector& coloringParts = entityRank_ == stk::topology::ELEMENT_RANK ? realm_.get_coloring_parts() : universalPartVec;
+
+    const stk::mesh::PartVector& coloringParts = entityRank_ == stk::topology::ELEMENT_RANK ? realm_.get_coloring_parts_for_topology(partVec_[0]->topology()) : universalPartVec;
 
     for (const stk::mesh::Part* colorPart : coloringParts)
     {

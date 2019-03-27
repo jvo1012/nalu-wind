@@ -506,16 +506,23 @@ Realm::initialize()
   std::ios_base::fmtflags f( NaluEnv::self().naluOutputP0().flags() );
 
   double start_time = NaluEnv::self().nalu_time();
-  stk::balance::BasicColoringSettings coloringSettings;
+  stk::balance::BasicColoringByTopologySettings coloringSettings;
   stk::balance::colorStkMesh(coloringSettings, *bulkData_);
-  stk::balance::fill_coloring_parts(*metaData_, coloringParts_);
-  double end_time = NaluEnv::self().nalu_time();
 
-  NaluEnv::self().naluOutputP0().flags( f );
+  for (stk::mesh::Part* part : stk::balance::get_root_topology_parts_for_rank(*bulkData_, stk::topology::ELEMENT_RANK))
+  {
+    stk::mesh::PartVector coloringParts;
+    stk::topology topo = part->topology();
+    stk::balance::fill_coloring_parts_with_topology(*metaData_, topo, coloringParts);
+    coloringPartMap_.insert(std::make_pair(topo, coloringParts));  
+    NaluEnv::self().naluOutputP0() << "Number of Colors for " << topo.name() << " = " << coloringParts.size() << std::endl;
+  }
   
+  double end_time = NaluEnv::self().nalu_time();
+  NaluEnv::self().naluOutputP0().flags( f );
+
   NaluEnv::self().naluOutputP0() << "Time for coloring = " << (end_time - start_time) << " seconds" << std::endl;
   sierra::nalu::dump_bucket_statistics(*bulkData_, NaluEnv::self().naluOutputP0());
-  NaluEnv::self().naluOutputP0() << "Number of Colors = " << coloringParts_.size() << std::endl;
 
   // output and restart files
   create_output_mesh();
@@ -4839,6 +4846,23 @@ Realm::using_tensor_product_kernels() const
 {
   return solutionOptions_->newHO_;
 }
+
+//--------------------------------------------------------------------------
+//-------- get_coloring_parts_for_topology() -------------------------------
+//--------------------------------------------------------------------------
+const stk::mesh::PartVector& Realm::get_coloring_parts_for_topology(const stk::topology topo)
+{
+  std::map<stk::topology, stk::mesh::PartVector>::iterator iter = coloringPartMap_.find(topo);
+  if (iter != coloringPartMap_.end()) 
+  {
+    return iter->second;
+  }
+ 
+  stk::mesh::PartVector empty;
+  auto ret = coloringPartMap_.insert(std::make_pair(topo, empty));
+  return ret.first->second;
+}
+
 
 } // namespace nalu
 } // namespace Sierra
